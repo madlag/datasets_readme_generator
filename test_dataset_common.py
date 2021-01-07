@@ -197,7 +197,11 @@ class DatasetTester(object):
                 for split in dataset_builder.info.splits.keys():
                     # check that loaded datset is not empty
                     self.parent.assertTrue(len(dataset[split]) > 0)
-                ret[config.name] = dataset
+
+                if config is None:
+                    ret["default"] = dataset
+                else:
+                    ret[config.name] = dataset
         return ret
 
 def get_local_dataset_names():

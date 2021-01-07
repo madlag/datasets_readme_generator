@@ -8,6 +8,7 @@ from io import StringIO
 from pathlib import Path
 import jinja2
 from utils import pretty_json
+import datasets
 
 def pprint(a):
     print(json.dumps(a, indent=4))
@@ -169,14 +170,14 @@ class DatasetREADMESingleWriter:
 
     def get_main_config(self):
         if "default" in self.dataset_infos:
-            return self.dataset_infos
+            return self.dataset_infos["default"]
         else:
             return list(self.dataset_infos.values())[0]
 
     def get_subpart_content(self, part, subpart):
         main_config = self.get_main_config()
         if subpart == "Dataset Summary":
-            return main_config["description"]
+            return main_config.get("description", self.MORE_INFORMATION)
         elif subpart == "Languages":
             return self.MORE_INFORMATION
         elif subpart == "Dataset Curators":
@@ -219,22 +220,17 @@ class DatasetREADMESingleWriter:
         path = self.path
         name = self.name
 
-        print(self.path)
-        if (path / "README.md").exists():
-            return False
-
         self.dataset_per_config = self.load_dummy_dataset(name)
 
-
-        with open(path / (name + ".py")) as f:
-            print(f.read())
+#        with open(path / (name + ".py")) as f:
+#            print(f.read())
 #        for filename in os.listdir(self.path):
 #            print(filename)
 
         with open(path / "dataset_infos.json") as f:
             self.dataset_infos = json.load(f)
             dataset_infos = self.dataset_infos
-            print(json.dumps(dataset_infos, indent=4))
+#             (json.dumps(dataset_infos, indent=4))
 
         self.config_names = list(dataset_infos.keys())
         self.config_names.sort()
@@ -252,7 +248,22 @@ class DatasetREADMESingleWriter:
             feature_keys = list(input_config["features"].keys())
             feature_keys.sort()
 
-            config["fields"] = {k:input_config["features"][k]["dtype"] for k in feature_keys}
+            def get_feature_string(f):
+                if "dtype" in f:
+                    return f["dtype"]
+                elif "_type" in f:
+                    s = ""
+                    if "feature" in f:
+                        if "dtype" in f["feature"]:
+                            s = f["feature"]["dtype"]
+                        else:
+                            for k, v in f["feature"].items():
+                                s += k + ":" + v['dtype'] + ","
+                    else:
+                        raise Exception("Unknown structure")
+                    return f"{f['_type']}[{s}]"
+
+            config["fields"] = {k:get_feature_string(input_config["features"][k]) for k in feature_keys}
 
         # Prettyfying the config split size: check if all configs have the same splits, and if yes, build a single
         # table containing all the split sizes
@@ -289,14 +300,8 @@ class DatasetREADMESingleWriter:
             was_empty = empty
         ret = new_ret
 
-        print(ret)
-        # Write the result
-        with (Path(".")/ "README.md").open("w") as readme_file:
-            readme_file.write(ret)
-        #for f in os.listdir(path):
-        #    print(f)
 
-        return True
+        return ret
 
 
 class DatasetREADMEWriter:
@@ -304,30 +309,33 @@ class DatasetREADMEWriter:
         self.path = path
 
     def run(self):
-        for i, k in enumerate(os.listdir(self.path)):
-            if i < 0:
-#                print(f"skipped {k}")
-                continue
-            s = DatasetREADMESingleWriter(self.path / k, k)
-            processed= s.run()
-            if processed:
-                break
+        dest_path = Path(__file__).parent / "READMEs"
+        if not dest_path.exists():
+            dest_path.mkdir()
 
+        with open("error.log", "w") as errors:
+            p = Path(__file__).parent / "datasets"
 
+            # Create the link to datasets/datasets directory
+            if not p.exists():
+                datasets_target = Path(datasets.__file__).parent.parent.parent / "datasets"
+                p.symlink_to(datasets_target)
+
+            for i, k in enumerate(os.listdir(self.path)):
+                try:
+                    s = DatasetREADMESingleWriter(self.path / k, k)
+                    processed = s.run()
+
+                    with (dest_path / (k  + "_README.md")).open("w") as readme_file:
+                        readme_file.write(processed)
+
+                except Exception as e :
+                    errors.write(k + ":" + str(e) + "\n")
 
 def main():
     path = Path("/home/lagunas/devel/hf/datasets_hf/datasets")
     d = DatasetREADMEWriter(path)
     d.run()
-
-
-def main2():
-    import test_dataset_common as common
-    dataset_tester = common.DatasetTester(None)
-    dataset_name = "wikitext"
-    configs = dataset_tester.load_all_configs(dataset_name=dataset_name, is_local=True)
-    configs = dataset_tester.check_load_dataset(dataset_name, configs, is_local=True)
-    print(configs["wikitext-103-v1"]["test"][2])
 
 if __name__ == "__main__":
     main()
