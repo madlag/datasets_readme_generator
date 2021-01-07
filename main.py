@@ -13,6 +13,49 @@ import datasets
 def pprint(a):
     print(json.dumps(a, indent=4))
 
+def show_features(features, name="", is_sequence=False):
+    if isinstance(features, list):
+        return show_features(features[0], name, is_sequence=True)
+    if not isinstance(features, dict):
+        return []
+    if features.get("_type", None) == 'Sequence':
+        if "dtype" in features["feature"] or ("_type" in features["feature"] and features["feature"]["_type"] == "ClassLabel"):
+            desc = show_features(features["feature"], name, is_sequence=True)
+            return desc
+        else:
+            if is_sequence:
+                desc = [f"- `{name}`: a `list` of dictionary features containing:"]
+            else:
+                desc = [f"- `{name}`: a dictionary feature containing:"]
+            for k, v in features["feature"].items():
+                pre_desc = show_features(v, name=k)
+                desc += ["  " + d for d in pre_desc]
+            return desc
+    elif features.get("_type", None) == 'Value':
+        if is_sequence:
+            desc = f"- `{name}`: a `list` of `{features['dtype']}` features."
+        else:
+            desc = f"- `{name}`: a `{features['dtype']}` feature."
+        return [desc]
+    elif features.get("_type", None) == 'ClassLabel':
+        if is_sequence:
+            desc = f"- `{name}`: a `list` of classification labels, with possible values including {', '.join(['`'+nm+'`' for nm in features['names'][:5]])}."
+        else:
+            desc = f"- `{name}`: a classification label, with possible values including {', '.join(['`'+nm+'`' for nm in features['names'][:5]])}."
+        return [desc]
+    elif features.get("_type", None) in ['Translation', 'TranslationVariableLanguages']:
+        if is_sequence:
+            desc = f"- `{name}`: a `list` of multilingual `string` variables, with possible languages including {', '.join(['`'+nm+'`' for nm in features['languages'][:5]])}."
+        else:
+            desc = f"- `{name}`: a multilingual `string` variable, with possible languages including {', '.join(['`'+nm+'`' for nm in features['languages'][:5]])}."
+        return [desc]
+    else:
+        desc = []
+        for k, v in features.items():
+            pre_desc = show_features(v, name=k)
+            desc += pre_desc
+        return desc
+
 class DatasetREADMESingleWriter:
     MORE_INFORMATION = "[More Information Needed]"
 
@@ -245,25 +288,7 @@ class DatasetREADMESingleWriter:
             config["excerpt"] = self.get_best_excerpt(config_name, config["excerpt_split"])
             config["data_splits_str"], config["split_sizes"] = self.config_split_sizes_string(input_config, config_name)
 
-            feature_keys = list(input_config["features"].keys())
-            feature_keys.sort()
-
-            def get_feature_string(f):
-                if "dtype" in f:
-                    return f["dtype"]
-                elif "_type" in f:
-                    s = ""
-                    if "feature" in f:
-                        if "dtype" in f["feature"]:
-                            s = f["feature"]["dtype"]
-                        else:
-                            for k, v in f["feature"].items():
-                                s += k + ":" + v['dtype'] + ","
-                    else:
-                        raise Exception("Unknown structure")
-                    return f"{f['_type']}[{s}]"
-
-            config["fields"] = {k:get_feature_string(input_config["features"][k]) for k in feature_keys}
+            config["fields"] = "\n".join(show_features(input_config["features"]))
 
         # Prettyfying the config split size: check if all configs have the same splits, and if yes, build a single
         # table containing all the split sizes
