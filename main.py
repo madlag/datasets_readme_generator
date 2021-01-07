@@ -230,7 +230,7 @@ class DatasetREADMESingleWriter:
         with open(path / "dataset_infos.json") as f:
             self.dataset_infos = json.load(f)
             dataset_infos = self.dataset_infos
-#             (json.dumps(dataset_infos, indent=4))
+            print(json.dumps(dataset_infos, indent=4))
 
         self.config_names = list(dataset_infos.keys())
         self.config_names.sort()
@@ -313,7 +313,6 @@ class DatasetREADMEWriter:
         if not dest_path.exists():
             dest_path.mkdir()
 
-        with open("error.log", "w") as errors:
             p = Path(__file__).parent / "datasets"
 
             # Create the link to datasets/datasets directory
@@ -321,16 +320,25 @@ class DatasetREADMEWriter:
                 datasets_target = Path(datasets.__file__).parent.parent.parent / "datasets"
                 p.symlink_to(datasets_target)
 
-            for i, k in enumerate(os.listdir(self.path)):
-                try:
-                    s = DatasetREADMESingleWriter(self.path / k, k)
-                    processed = s.run()
+        errors = {}
+        for i, k in enumerate(os.listdir(self.path)):
+            try:
+                s = DatasetREADMESingleWriter(self.path / k, k)
+                processed = s.run()
 
-                    with (dest_path / (k  + "_README.md")).open("w") as readme_file:
-                        readme_file.write(processed)
+                with (dest_path / (k  + "_README.md")).open("w") as readme_file:
+                    readme_file.write(processed)
 
-                except Exception as e :
-                    errors.write(k + ":" + str(e) + "\n")
+
+            except Exception as e :
+                errors[k] = str(e)
+
+        error_keys = list(errors.keys())
+        error_keys.sort()
+        with open("error.log", "w") as error_file:
+            for key in error_keys:
+                error_file.write(key + ":" + errors[key] + "\n")
+
 
 def main():
     path = Path("/home/lagunas/devel/hf/datasets_hf/datasets")
