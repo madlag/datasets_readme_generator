@@ -57,7 +57,7 @@ def show_features(features, name="", is_sequence=False):
         return desc
 
 class DatasetREADMESingleWriter:
-    MORE_INFORMATION = "[More Information Needed]"
+    MORE_INFORMATION = "[More Information Needed](https://github.com/huggingface/datasets/blob/master/CONTRIBUTING.md#how-to-contribute-to-the-dataset-cards)"
 
     TOC = {
         "Dataset Description": ["Dataset Summary", "Supported Tasks", "Languages"],
