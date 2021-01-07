@@ -36,8 +36,7 @@ The data fields are the same among all splits.
 {% else %} 
 {% for config_name, config in configs.items() %} 
 #### {{config_name}}
-{% for field_name, field_description in config.fields.items() %} 
-- `{{field_name}}`: {{field_description}}{% endfor %}
+{{ config.fields }} 
 {% endfor %} {# end of 'for config_name, config in config.items()' #}
 {% endif %}
 {% elif subpart == "Data Splits" %} {# ################## DATA SPLIT #}

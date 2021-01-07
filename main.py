@@ -81,13 +81,21 @@ class DatasetREADMESingleWriter:
     }
 
     def __init__(self, path, name):
+        # Dataset path in datasets repository
         self.path = Path(path)
+        # Dataset name
         self.name = name
         # Load the jinja template
         template_file = Path(__file__).parent / "README.template.md"
         self.template = jinja2.Template(template_file.open().read())
+        # Initialize the warnings
+        self.warnings = []
+
+    def warn(self, message):
+        self.warnings.append(message)
 
     def get_markdown_string(self, markdown_writer):
+        # Build a markdown string from a markdown writer (for tables layout for example)
         markdown = ""
         s = StringIO(markdown)
         s.close = lambda: None
@@ -97,18 +105,21 @@ class DatasetREADMESingleWriter:
         ret = "".join(lines) + "\n\n"
         return ret
 
-    def get_toc(self):
-        return self.TOC
+    def get_main_config(self):
+        if "default" in self.dataset_infos:
+            return self.dataset_infos["default"]
+        else:
+            return list(self.dataset_infos.values())[0]
 
     def get_header(self):
-        info = self.dataset_infos
+        # Build a dictionary containing information from the dataset for the header part of the jina template
         header_keys = ["Homepage", "Repository", "Paper", "Point of Contact"]
 
-        homepage = None
-        for k, v in info.items():
-            homepage = v["homepage"]
-            break
+        # Get the main config to get the homepagae information
+        main_config = self.get_main_config()
+        homepage = main_config["homepage"]
 
+        # Build the dictionary (mostly placeholder right now)
         MORE_INFORMATION = self.MORE_INFORMATION
         header_values = [homepage, MORE_INFORMATION, MORE_INFORMATION, MORE_INFORMATION]
 
@@ -118,41 +129,8 @@ class DatasetREADMESingleWriter:
 
         return ret
 
-    def get_data_fields_description(self):
-        output_parts = []
-        for config_name, config_info in self.configs_info.items():
-            headers = ["field name", "type", "description"]
-            values = []
-            for field_name, field_description in config_info["fields"].items():
-                field_info = self.last_class_info.get(field_name, {})
-                try:
-                    type = field_info["type"]
-                    comment = field_info["comment"]
-                except:
-                    print("MISSING FIELD INFORMATION", self.dataset_name, config_name, field_name, field_info)
-                    raise
-
-                values.append([field_name, type, comment])
-
-            writer = MarkdownTableWriter(
-                table_name=f"### {config_name}", headers=headers, value_matrix=values
-            )
-
-            output_parts.append(self.get_markdown_string(writer))
-
-        all_the_same = all([output_part == output_parts[0] for output_part in output_parts])
-        if all_the_same:
-            output = "#### " + ", ".join(list(self.configs_info.keys())) + "\n\n"
-            output += output_parts[0]
-        else:
-            output = ""
-            for index, config_name in enumerate(self.configs_info):
-                output += f"#### {config_name}\n\n"
-                output += output_parts[index]
-
-        return output
-
     def ordered_split_names(self, input_config):
+        # Try to order the split names, to have something like "train, validation, test"
         split_names = list(input_config["splits"].keys())
 
         split_names_and_priority = []
@@ -168,7 +146,6 @@ class DatasetREADMESingleWriter:
         split_names_and_priority.sort(key = lambda x : x[0])
 
         return [e[1] for e in split_names_and_priority]
-
 
     def config_split_sizes_string(self, input_config, config_name):
         """Returns the string for the markdown table containing splits size, and a dict containing them."""
@@ -211,12 +188,6 @@ class DatasetREADMESingleWriter:
             # The splits are not the same -> no aggregated table
             return None
 
-    def get_main_config(self):
-        if "default" in self.dataset_infos:
-            return self.dataset_infos["default"]
-        else:
-            return list(self.dataset_infos.values())[0]
-
     def get_subpart_content(self, part, subpart):
         main_config = self.get_main_config()
         if subpart == "Dataset Summary":
@@ -241,39 +212,39 @@ class DatasetREADMESingleWriter:
         return configs
 
     def get_best_excerpt(self, config_name, split_name):
-        best_excerpt = ""
+        try:
+            best_excerpt = ""
 
-        MIN_LENGTH = 100
-        MAX_LENGTH = 1000
-        for i, e in enumerate(self.dataset_per_config[config_name][split_name]):
-            if i > 100:
-                break
-            excerpt = pretty_json(e)
-            if len(excerpt) > len(best_excerpt):
-                if len(excerpt) < MAX_LENGTH or len(best_excerpt) == 0:
-                    best_excerpt = excerpt
-            else:
-                if len(best_excerpt) > MAX_LENGTH:
-                    if len(excerpt) > MIN_LENGTH:
+            MIN_LENGTH = 100
+            MAX_LENGTH = 1000
+            for i, e in enumerate(self.dataset_per_config[config_name][split_name]):
+                if i > 100:
+                    break
+                excerpt = pretty_json(e)
+                if len(excerpt) > len(best_excerpt):
+                    if len(excerpt) < MAX_LENGTH or len(best_excerpt) == 0:
                         best_excerpt = excerpt
+                else:
+                    if len(best_excerpt) > MAX_LENGTH:
+                        if len(excerpt) > MIN_LENGTH:
+                            best_excerpt = excerpt
+        except:
+            self.warn(f"Could not find excerpt for {config_name}/{split_name}")
 
         return best_excerpt
 
     def run(self):
-        path = self.path
-        name = self.name
-
-        self.dataset_per_config = self.load_dummy_dataset(name)
+        self.dataset_per_config = self.load_dummy_dataset(self.name)
 
 #        with open(path / (name + ".py")) as f:
 #            print(f.read())
 #        for filename in os.listdir(self.path):
 #            print(filename)
 
-        with open(path / "dataset_infos.json") as f:
+        with open(self.path / "dataset_infos.json") as f:
             self.dataset_infos = json.load(f)
             dataset_infos = self.dataset_infos
-            print(json.dumps(dataset_infos, indent=4))
+            #print(json.dumps(dataset_infos, indent=4))
 
         self.config_names = list(dataset_infos.keys())
         self.config_names.sort()
@@ -284,9 +255,13 @@ class DatasetREADMESingleWriter:
             config = {}
             self.configs_info[config_name] = config
 
-            config["excerpt_split"] = random.choice(list(input_config["splits"].keys()))
+            splits = list(input_config["splits"].keys())
+            if "test" in splits and len(splits) != 1:
+                splits.remove("test")
+            config["excerpt_split"] = random.choice(splits)
             config["excerpt"] = self.get_best_excerpt(config_name, config["excerpt_split"])
             config["data_splits_str"], config["split_sizes"] = self.config_split_sizes_string(input_config, config_name)
+
 
             config["fields"] = "\n".join(show_features(input_config["features"]))
 
@@ -296,7 +271,7 @@ class DatasetREADMESingleWriter:
 
         header = self.get_header()
 
-        toc = self.get_toc()
+        toc = self.TOC
 
         for part_name, subparts in toc.items():
             toc[part_name] = {}
@@ -305,7 +280,7 @@ class DatasetREADMESingleWriter:
 
         # Render the template with the gathered information
         ret = self.template.render(
-            dataset_name = name,
+            dataset_name = self.name,
             toc=toc,
             header=header,
             configs=self.configs_info,
@@ -333,6 +308,13 @@ class DatasetREADMEWriter:
     def __init__(self, path):
         self.path = path
 
+    def dump_info(self, info, kind):
+        info_keys = list(info.keys())
+        info_keys.sort()
+        with open(f"{kind}.log", "w") as info_file:
+            for key in info_keys:
+                info_file.write(key + ":" + str(info[key]) + "\n")
+
     def run(self):
         dest_path = Path(__file__).parent / "READMEs"
         if not dest_path.exists():
@@ -344,25 +326,40 @@ class DatasetREADMEWriter:
             if not p.exists():
                 datasets_target = Path(datasets.__file__).parent.parent.parent / "datasets"
                 p.symlink_to(datasets_target)
-
         errors = {}
+        warnings = {}
         for i, k in enumerate(os.listdir(self.path)):
             try:
+                dest_file = dest_path / (k  + "_README.md")
+                if dest_file.exists():
+                    continue
                 s = DatasetREADMESingleWriter(self.path / k, k)
                 processed = s.run()
 
-                with (dest_path / (k  + "_README.md")).open("w") as readme_file:
+                if len(s.warnings) != 0:
+                    warnings[k] = s.warnings
+
+                assert(len(processed) != 0)
+                with dest_file.open("w") as readme_file:
                     readme_file.write(processed)
 
-
+            except FileNotFoundError as e:
+                if e.filename == None or \
+                    e.filename.endswith("dataset_infos.json") or \
+                    "dummy_data" in e.filename:
+                    errors[k] = e
+                else:
+                    raise
+            except OSError as e:
+                if "dummy_data" in str(e):
+                    errors[k] = e
+                else:
+                    raise
             except Exception as e :
-                errors[k] = str(e)
+                errors[k] = e
 
-        error_keys = list(errors.keys())
-        error_keys.sort()
-        with open("error.log", "w") as error_file:
-            for key in error_keys:
-                error_file.write(key + ":" + errors[key] + "\n")
+        self.dump_info(errors, "error")
+        self.dump_info(warnings, "warning")
 
 
 def main():
