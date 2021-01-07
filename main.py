@@ -312,6 +312,7 @@ class DatasetREADMESingleWriter:
             header=header,
             configs=self.configs_info,
             aggregated_data_splits_str=aggregated_data_splits_str,
+            MORE_INFORMATION=self.MORE_INFORMATION,
         )
 
 #        yaml_header = self.get_yaml_header() + "\n"

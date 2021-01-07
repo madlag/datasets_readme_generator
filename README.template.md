@@ -1,5 +1,6 @@
 ---
 ---
+
 # Dataset Card for "{{dataset_name}}"
 
 ## Table of Contents
@@ -57,7 +58,7 @@ The data fields are the same among all splits.
 {% endif %}
 
 {% else %}
-{{subpart_content or "[More Information Needed]"}}
+{{subpart_content or MORE_INFORMATION}}
 {% endif %}
 
 {% endfor %}{% endfor %}
