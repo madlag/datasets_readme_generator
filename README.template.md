@@ -1,3 +1,5 @@
+---
+---
 # Dataset Card for "{{dataset_name}}"
 
 ## Table of Contents
@@ -21,6 +23,9 @@
 {% if configs|length > 1%}
 #### {{config_name}}
 {% endif %}
+{% if config.download_size %}
+Download size: {{ config.download_size }}
+{% endif %}
 An example of '{{config.excerpt_split}}' looks as follows.
 ```
 {{config.excerpt}}
@@ -39,7 +44,7 @@ The data fields are the same among all splits.
 {{ config.fields }} 
 {% endfor %} {# end of 'for config_name, config in config.items()' #}
 {% endif %}
-{% elif subpart == "Data Splits" %} {# ################## DATA SPLIT #}
+{% elif subpart == "Data Splits Sample Size" %} {# ################## DATA SPLITS SIZE #}
 
 {% if aggregated_data_splits_str %}
 {{aggregated_data_splits_str}}

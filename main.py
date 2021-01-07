@@ -9,6 +9,8 @@ from pathlib import Path
 import jinja2
 from utils import pretty_json
 import datasets
+from collections import defaultdict
+
 
 def pprint(a):
     print(json.dumps(a, indent=4))
@@ -61,7 +63,7 @@ class DatasetREADMESingleWriter:
 
     TOC = {
         "Dataset Description": ["Dataset Summary", "Supported Tasks", "Languages"],
-        "Dataset Structure": ["Data Instances", "Data Fields", "Data Splits"],
+        "Dataset Structure": ["Data Instances", "Data Fields", "Data Splits Sample Size"],
         "Dataset Creation": [
             "Curation Rationale",
             "Source Data",
@@ -111,6 +113,11 @@ class DatasetREADMESingleWriter:
         else:
             return list(self.dataset_infos.values())[0]
 
+    def format_size(self, size):
+        size = size / 1024 / 1024
+        size = "%0.2f MB" % size
+        return size
+
     def get_header(self):
         # Build a dictionary containing information from the dataset for the header part of the jina template
         header_keys = ["Homepage", "Repository", "Paper", "Point of Contact"]
@@ -121,12 +128,15 @@ class DatasetREADMESingleWriter:
 
         # Build the dictionary (mostly placeholder right now)
         MORE_INFORMATION = self.MORE_INFORMATION
-        header_values = [homepage, MORE_INFORMATION, MORE_INFORMATION, MORE_INFORMATION]
+        download_size = self.global_sizes.get("download_size")
+        header_values = [f"[{homepage}]({homepage})", MORE_INFORMATION, MORE_INFORMATION, MORE_INFORMATION]
+        if download_size is not None:
+            header_keys += ["Download Size"]
+            header_values += [self.format_size(download_size)]
 
         ret = {}
         for i, k in enumerate(header_keys):
             ret[k] = header_values[i]
-
         return ret
 
     def ordered_split_names(self, input_config):
@@ -228,13 +238,24 @@ class DatasetREADMESingleWriter:
                     if len(best_excerpt) > MAX_LENGTH:
                         if len(excerpt) > MIN_LENGTH:
                             best_excerpt = excerpt
+            return best_excerpt
         except:
             self.warn(f"Could not find excerpt for {config_name}/{split_name}")
+            return ""
 
-        return best_excerpt
+    SIZE_KEYS=["download_size", "dataset_size", "size_in_bytes"]
+
+    def compute_sizes(self):
+        self.global_sizes = defaultdict(int)
+        for config_name, config in self.dataset_infos.items():
+            for key in self.SIZE_KEYS:
+                self.global_sizes[key] += config[key]
 
     def run(self):
-        self.dataset_per_config = self.load_dummy_dataset(self.name)
+        try:
+            self.dataset_per_config = self.load_dummy_dataset(self.name)
+        except Exception as e:
+            self.warn(e)
 
 #        with open(path / (name + ".py")) as f:
 #            print(f.read())
@@ -245,6 +266,8 @@ class DatasetREADMESingleWriter:
             self.dataset_infos = json.load(f)
             dataset_infos = self.dataset_infos
             #print(json.dumps(dataset_infos, indent=4))
+
+        self.compute_sizes()
 
         self.config_names = list(dataset_infos.keys())
         self.config_names.sort()
@@ -264,6 +287,10 @@ class DatasetREADMESingleWriter:
 
 
             config["fields"] = "\n".join(show_features(input_config["features"]))
+
+            for key in self.SIZE_KEYS:
+                if key in input_config:
+                    config[key] = self.format_size(input_config[key])
 
         # Prettyfying the config split size: check if all configs have the same splits, and if yes, build a single
         # table containing all the split sizes
@@ -307,37 +334,44 @@ class DatasetREADMESingleWriter:
 class DatasetREADMEWriter:
     def __init__(self, path):
         self.path = path
+        self.errors = {}
+        self.warnings = {}
 
     def dump_info(self, info, kind):
         info_keys = list(info.keys())
         info_keys.sort()
         with open(f"{kind}.log", "w") as info_file:
             for key in info_keys:
-                info_file.write(key + ":" + str(info[key]) + "\n")
+                info_file.write(key + ":" + str(info[key]).replace("\n", "    ") + "\n")
 
-    def run(self):
-        dest_path = Path(__file__).parent / "READMEs"
+    def add_error(self, name, error):
+        print("ERROR", error)
+        self.errors[name] = str(error)
+
+    def add_warning(self, name, warnings):
+        self.warnings[name] = str(warnings)
+
+    def run(self, force=True):
+        dest_path = Path(__file__).parent / "datasets"
         if not dest_path.exists():
             dest_path.mkdir()
 
-            p = Path(__file__).parent / "datasets"
+        p = Path(__file__).parent / "datasets"
+        # Create the link to datasets/datasets directory
+        if not p.exists():
+            datasets_target = Path(datasets.__file__).parent.parent.parent / "datasets"
+            p.symlink_to(datasets_target)
 
-            # Create the link to datasets/datasets directory
-            if not p.exists():
-                datasets_target = Path(datasets.__file__).parent.parent.parent / "datasets"
-                p.symlink_to(datasets_target)
-        errors = {}
-        warnings = {}
         for i, k in enumerate(os.listdir(self.path)):
             try:
-                dest_file = dest_path / (k  + "_README.md")
-                if dest_file.exists():
+                dest_file = dest_path / k  / "README.md"
+                if dest_file.exists() and not force :
                     continue
                 s = DatasetREADMESingleWriter(self.path / k, k)
                 processed = s.run()
 
                 if len(s.warnings) != 0:
-                    warnings[k] = s.warnings
+                    self.add_warning(k, s.warnings)
 
                 assert(len(processed) != 0)
                 with dest_file.open("w") as readme_file:
@@ -347,25 +381,25 @@ class DatasetREADMEWriter:
                 if e.filename == None or \
                     e.filename.endswith("dataset_infos.json") or \
                     "dummy_data" in e.filename:
-                    errors[k] = e
+                    self.add_error(k, e)
                 else:
                     raise
             except OSError as e:
                 if "dummy_data" in str(e):
-                    errors[k] = e
+                    self.add_error(k, e)
                 else:
                     raise
             except Exception as e :
-                errors[k] = e
+                self.add_error(k, e)
 
-        self.dump_info(errors, "error")
-        self.dump_info(warnings, "warning")
+        self.dump_info(self.errors, "error")
+        self.dump_info(self.warnings, "warning")
 
 
 def main():
     path = Path("/home/lagunas/devel/hf/datasets_hf/datasets")
     d = DatasetREADMEWriter(path)
-    d.run()
+    d.run(force=False)
 
 if __name__ == "__main__":
     main()
