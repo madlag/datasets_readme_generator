@@ -335,8 +335,7 @@ class DatasetREADMESingleWriter:
 
 
 class DatasetREADMEWriter:
-    def __init__(self, path):
-        self.path = path
+    def __init__(self):
         self.errors = {}
         self.warnings = {}
 
@@ -356,21 +355,17 @@ class DatasetREADMEWriter:
 
     def run(self, force=True):
         dest_path = Path(__file__).parent / "datasets"
-        if not dest_path.exists():
-            dest_path.mkdir()
-
-        p = Path(__file__).parent / "datasets"
         # Create the link to datasets/datasets directory
-        if not p.exists():
+        if not dest_path.exists():
             datasets_target = Path(datasets.__file__).parent.parent.parent / "datasets"
-            p.symlink_to(datasets_target)
+            dest_path.symlink_to(datasets_target)
 
-        for i, k in enumerate(os.listdir(self.path)):
+        for i, k in enumerate(os.listdir(dest_path.resolve())):
             try:
                 dest_file = dest_path / k  / "README.md"
                 if dest_file.exists() and not force :
                     continue
-                s = DatasetREADMESingleWriter(self.path / k, k)
+                s = DatasetREADMESingleWriter(dest_path / k, k)
                 processed = s.run()
 
                 if len(s.warnings) != 0:
@@ -400,8 +395,7 @@ class DatasetREADMEWriter:
 
 
 def main():
-    path = Path("/home/yjernite/Code/kraken_repos/datasets/datasets")
-    d = DatasetREADMEWriter(path)
+    d = DatasetREADMEWriter()
     d.run(force=False)
 
 if __name__ == "__main__":
