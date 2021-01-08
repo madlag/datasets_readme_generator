@@ -210,4 +210,13 @@ indent = (4, None)
 
 
 def pretty_json(p):
-    return json.dumps(p, sort_keys=False, indent=indent, separators=[", ", ": "])
+    was_cropped = False
+    for k in p:
+        if len(json.dumps(p[k])) > 256:
+            was_cropped = True
+            p[k] = json.dumps(p[k], ensure_ascii=False)[:128] + "..."
+    p_json = json.dumps(p, sort_keys=False, ensure_ascii=False, indent=indent, separators=[", ", ": "])
+    if was_cropped:
+        return "This example was too long and was cropped:\n\n" + p_json
+    else:
+        return p_json

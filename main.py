@@ -41,9 +41,9 @@ def show_features(features, name="", is_sequence=False):
         return [desc]
     elif features.get("_type", None) == 'ClassLabel':
         if is_sequence:
-            desc = f"- `{name}`: a `list` of classification labels, with possible values including {', '.join(['`'+nm+'`' for nm in features['names'][:5]])}."
+            desc = f"- `{name}`: a `list` of classification labels, with possible values including {', '.join(['`'+nm+'` ('+str(lid)+')' for lid, nm in enumerate(features['names'][:5])])}."
         else:
-            desc = f"- `{name}`: a classification label, with possible values including {', '.join(['`'+nm+'`' for nm in features['names'][:5]])}."
+            desc = f"- `{name}`: a classification label, with possible values including {', '.join(['`'+nm+'` ('+str(lid)+')' for lid, nm in enumerate(features['names'][:5])])}."
         return [desc]
     elif features.get("_type", None) in ['Translation', 'TranslationVariableLanguages']:
         if is_sequence:
@@ -288,8 +288,6 @@ class DatasetREADMESingleWriter:
 
             config["excerpt_split"] = random.choice(splits)
             config["excerpt"] = self.get_best_excerpt(config_name, config["excerpt_split"])
-            if len(json.dumps(config["excerpt"])) > 2048:
-                config["excerpt"] = {"": "This example is too large to print."}
             config["fields"] = "\n".join(show_features(input_config["features"]))
 
             for key in self.SIZE_KEYS:
