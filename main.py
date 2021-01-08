@@ -82,11 +82,13 @@ class DatasetREADMESingleWriter:
         ],
     }
 
-    def __init__(self, path, name):
+    def __init__(self, path, name, max_configs=5):
         # Dataset path in datasets repository
         self.path = Path(path)
         # Dataset name
         self.name = name
+        # Max number of configs to show
+        self.max_configs = max_configs
         # Load the jinja template
         template_file = Path(__file__).parent / "README.template.md"
         self.template = jinja2.Template(template_file.open().read())
@@ -273,19 +275,21 @@ class DatasetREADMESingleWriter:
         self.config_names.sort()
 
         self.configs_info = {}
-        for config_name in self.config_names:
+        for config_num, config_name in enumerate(self.config_names[:self.max_configs]):
             input_config = dataset_infos[config_name]
             config = {}
             self.configs_info[config_name] = config
 
             splits = list(input_config["splits"].keys())
-            if "test" in splits and len(splits) != 1:
-                splits.remove("test")
-            config["excerpt_split"] = random.choice(splits)
-            config["excerpt"] = self.get_best_excerpt(config_name, config["excerpt_split"])
             config["data_splits_str"], config["split_sizes"] = self.config_split_sizes_string(input_config, config_name)
 
+            if "test" in splits and len(splits) != 1:
+                splits.remove("test")
 
+            config["excerpt_split"] = random.choice(splits)
+            config["excerpt"] = self.get_best_excerpt(config_name, config["excerpt_split"])
+            if len(json.dumps(config["excerpt"])) > 2048:
+                config["excerpt"] = {"": "This example is too large to print."}
             config["fields"] = "\n".join(show_features(input_config["features"]))
 
             for key in self.SIZE_KEYS:
@@ -398,7 +402,7 @@ class DatasetREADMEWriter:
 
 
 def main():
-    path = Path("/home/lagunas/devel/hf/datasets_hf/datasets")
+    path = Path("/home/yjernite/Code/kraken_repos/datasets/datasets")
     d = DatasetREADMEWriter(path)
     d.run(force=False)
 
