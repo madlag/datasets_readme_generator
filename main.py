@@ -10,7 +10,7 @@ import jinja2
 from utils import pretty_json
 import datasets
 from collections import defaultdict
-
+import test_dataset_common as common
 
 def pprint(a):
     print(json.dumps(a, indent=4))
@@ -130,11 +130,13 @@ class DatasetREADMESingleWriter:
 
         # Build the dictionary (mostly placeholder right now)
         MORE_INFORMATION = self.MORE_INFORMATION
-        download_size = self.global_sizes.get("download_size")
         header_values = [f"[{homepage}]({homepage})", MORE_INFORMATION, MORE_INFORMATION, MORE_INFORMATION]
-        if download_size is not None:
-            header_keys += ["Download Size"]
-            header_values += [self.format_size(download_size)]
+
+        for size_name, human_size_name in self.SIZE_KEYS.items():
+            size = self.global_sizes.get(size_name)
+            if size is not None:
+                header_keys += [human_size_name]
+                header_values += [self.format_size(size)]
 
         ret = {}
         for i, k in enumerate(header_keys):
@@ -217,7 +219,7 @@ class DatasetREADMESingleWriter:
             #return self.get_data_fields_description()
 
     def load_dummy_dataset(self, dataset_name):
-        import test_dataset_common as common
+
         dataset_tester = common.DatasetTester(None)
         configs = dataset_tester.load_all_configs(dataset_name=dataset_name, is_local=True)
         configs = dataset_tester.check_load_dataset(dataset_name, configs, is_local=True)
@@ -245,12 +247,12 @@ class DatasetREADMESingleWriter:
             self.warn(f"Could not find excerpt for {config_name}/{split_name}")
             return ""
 
-    SIZE_KEYS=["download_size", "dataset_size", "size_in_bytes"]
+    SIZE_KEYS={"download_size":"Size of downloaded dataset files", "dataset_size":"Size of the generated dataset", "size_in_bytes":"Total amount of disk used"}
 
     def compute_sizes(self):
         self.global_sizes = defaultdict(int)
         for config_name, config in self.dataset_infos.items():
-            for key in self.SIZE_KEYS:
+            for key in self.SIZE_KEYS.keys():
                 self.global_sizes[key] += config[key]
 
     def run(self):
@@ -290,9 +292,10 @@ class DatasetREADMESingleWriter:
             config["excerpt"] = self.get_best_excerpt(config_name, config["excerpt_split"])
             config["fields"] = "\n".join(show_features(input_config["features"]))
 
-            for key in self.SIZE_KEYS:
-                if key in input_config:
-                    config[key] = self.format_size(input_config[key])
+            config["sizes"] = {}
+            for size_name, human_size_name in self.SIZE_KEYS.items():
+                if size_name in input_config:
+                    config["sizes"][size_name] = (human_size_name, self.format_size(input_config[size_name]))
 
         # Prettyfying the config split size: check if all configs have the same splits, and if yes, build a single
         # table containing all the split sizes
@@ -360,11 +363,19 @@ class DatasetREADMEWriter:
             datasets_target = Path(datasets.__file__).parent.parent.parent / "datasets"
             dest_path.symlink_to(datasets_target)
 
-        for i, k in enumerate(os.listdir(dest_path.resolve())):
+        dest_path = dest_path.resolve()
+
+        dir_list = os.listdir(dest_path.resolve())
+        dir_list.sort()
+
+        for i, k in enumerate(dir_list):
             try:
                 dest_file = dest_path / k  / "README.md"
                 if dest_file.exists() and not force :
+                    print("SKIPPING", k)
                     continue
+                print("PROCESSING", k)
+                
                 s = DatasetREADMESingleWriter(dest_path / k, k)
                 processed = s.run()
 

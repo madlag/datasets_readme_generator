@@ -27,9 +27,9 @@ We show detailed information for up to 5 configurations of the dataset.
 
 {% for config_name, config in configs.items() %}
 #### {{config_name}}
-{% if config.download_size %}
-Download size: {{ config.download_size }}
-{% endif %}
+{% for size_name, (human_size_name, formatted_size) in config['sizes'].items() %}
+- **{{ human_size_name }}:** {{ formatted_size }}{% endfor %}
+
 An example of '{{config.excerpt_split}}' looks as follows.
 ```
 {{config.excerpt}}

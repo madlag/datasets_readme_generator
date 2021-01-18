@@ -134,7 +134,7 @@ class DatasetTester(object):
                     version=version,
                     cache_dir=raw_temp_dir,
                     is_local=is_local,
-                    download_callbacks=[check_if_url_is_valid],
+                    #download_callbacks=[check_if_url_is_valid],
                 )
 
                 if dataset_builder.__class__.__name__ == "Csv":
