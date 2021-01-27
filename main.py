@@ -356,7 +356,7 @@ class DatasetREADMEWriter:
     def add_warning(self, name, warnings):
         self.warnings[name] = str(warnings)
 
-    def run(self, force=True):
+    def run(self, force=False, to_run = None):
         dest_path = Path(__file__).parent / "datasets"
         # Create the link to datasets/datasets directory
         if not dest_path.exists():
@@ -365,7 +365,12 @@ class DatasetREADMEWriter:
 
         dest_path = dest_path.resolve()
 
-        dir_list = os.listdir(dest_path.resolve())
+        if to_run is None:
+            dir_list = os.listdir(dest_path.resolve())
+        else:
+            force = True
+            dir_list = to_run
+
         dir_list.sort()
 
         for i, k in enumerate(dir_list):
@@ -406,8 +411,10 @@ class DatasetREADMEWriter:
 
 
 def main():
+    import sys
     d = DatasetREADMEWriter()
-    d.run(force=False)
+    to_run = sys.argv[1:] or None
+    d.run(to_run = to_run)
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,9 @@
 ### How to use
 
 Current directory must be this git root directory.
-Just run: ```python main.py```
+Just run: ```python main.py``` to create all missing READMEs.
+Or run: ```python main.py DATASET_NAME``` to recreate (it will overwrite if existing) a datase README.
+
 
 It will create a READMEs directory, and output a file for each dataset, named X_README.md where X is the dataset name.
 (This is temporary, in the end those will have to be named just README.md and moved to the dataset directory)
