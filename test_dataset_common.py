@@ -133,7 +133,7 @@ class DatasetTester(object):
                     config=config,
                     version=version,
                     cache_dir=raw_temp_dir,
-                    is_local=is_local,
+                    use_local_dummy_data=is_local,
                     #download_callbacks=[check_if_url_is_valid],
                 )
 
