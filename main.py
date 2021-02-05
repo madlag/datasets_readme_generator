@@ -79,6 +79,7 @@ class DatasetREADMESingleWriter:
             "Dataset Curators",
             "Licensing Information",
             "Citation Information",
+            "Contributions",
         ],
     }
 
@@ -209,6 +210,8 @@ class DatasetREADMESingleWriter:
         elif subpart == "Languages":
             return self.MORE_INFORMATION
         elif subpart == "Dataset Curators":
+            return self.MORE_INFORMATION
+        elif subpart == "Contributions":
             return self.MORE_INFORMATION
         elif subpart ==  "Licensing Information":
             return main_config["license"] or self.MORE_INFORMATION
